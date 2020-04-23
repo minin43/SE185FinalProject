@@ -30,12 +30,16 @@
 //(True) constants
 #define MAXIMUM_WORD_LENGTH 16
 #define MAXIMUM_FILE_LENGTH 2000
+#define END_GAME_LINE 80
+//Set number of total words:
+	int totalWordNum;
+
 
 //Struct listings:
 
 
 //Function prototypes:
-void addWord(char *word);
+void printWord(char *word);
 int addWordToGame(FILE *fp);
 
 void SaveWordsLoop();
@@ -46,8 +50,10 @@ double RunTheGame(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]);
 int main() {
     //Start by openiong up our text file of words
     char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH];
+	
+	srand(time(NULL));
 
-	//srand(time(NULL));
+	
 
     //If our text file doesn't exist, prevent the program from running - do this here once so we don't have to check later if we run PopulateStringTable multiple times
     FILE *fp = fopen("wordList.txt", "r");
@@ -92,23 +98,6 @@ int main() {
 
     printf("Thanks for playing!");
 
-	//Ask if ready to start game:
-	/*char start;
-	printf("Are you ready to start? (y/n)\n");
-	scanf("%c", &start);
-
-	if(start == 'n'){
-		return 0;
-	}
-
-	//Ask if want to add words to game
-	char input;
-	printf("Would you like to add words to the game?(y/n)\n");
-	scanf(" %c", &input);
-	if(input == 'y'){
-		addWordToGame(fp);
-	}*/
-
     return 0;
 }
 
@@ -121,48 +110,15 @@ int main() {
  *The world should always be contained in the board, i.e. have enough space for its right for its length
  *
  */
-void addWord(char *word){
+void printWord(char *word){
 	int lengthOfScreen = 80;
 	int wordLength = strlen(word);
 	int startingPosition = (rand()% (lengthOfScreen-wordLength));
-	//printf("Starting is : %d\n", startingPosition);
 	
 	for(int i = 0; i<startingPosition; i++){
 		printf(" ");
 	}
 	printf("%s\n", word);
-}
-
-/*
- *@author Marissa
- *This function appends a user-given word to the end of the wordList.txt file.
- *This addition continues between games.
- *
- */
-int addWordToGame(FILE *fp){
-	//Reopen file to append
-	fp = fopen("wordList.txt", "a");
-	
-	//If our text file doesn't exist, prevent the program from running
-	if (fp == NULL) {
-		printf("File not found, please include a text document wordList.txt in the source files.\n");
-		return 0;
-	}
-	
-	char newWord[20];
-	char input = 'y';
-	
-	//Add words until they don't want to add more
-	while (input == 'y') {
-		printf("Enter the word you would like to add to game: \n");
-		scanf(" %s", &newWord);
-		fputs("\n", fp);
-		fputs(newWord, fp);
-		printf("Would you like to add another word to the game? (y/n)\n");
-		scanf(" %c", &input);
-	}
-	fclose(fp);
-	return 0;
 }
 
 /*
@@ -201,7 +157,31 @@ void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENG
         fscanf(fp, " %s", stringArray[count]);
 		count++;
     }
+	totalWordNum = count;
 	fclose(fp);
+}
+
+/*
+ *Prints the current list
+ *
+**/
+
+void printCurrentList(){
+	
+}
+/*
+ *This function will need to remove word from list, shift other words up?
+ *
+ */
+void removeWordFromList(char *input){
+	
+}
+
+/*
+*I feel like this function is complicated, need to check if word fits in each line
+**/
+void addWordToList(){
+	
 }
 
 /*
@@ -210,5 +190,49 @@ void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENG
  * Returns how long the function is ran for (which equals how long the user played the game for).
 **/
 double RunTheGame(char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]) {
-    return 0.0;
+    char input[20];
+	
+	//start initial clock
+	clock_t  initialClock = clock();
+	
+	//start loop: while (! at bottom of screen || wordList is empty)
+	FILE *fp = fopen("wordList.txt", "r");
+	int lineCount = 0;
+	
+	while((lineCount != END_GAME_LINE)&&(!feof(fp)){
+		//start per word clock
+		clock_t initialWordClock = clock();
+		
+		//TODO: create function
+		printCurrentList();
+		
+		//get input
+		scanf(" %c", input);
+		
+		//stop word clock
+		clock_t finalWordClock = clock(&input);
+		
+		//TODO: create function, remove word from list if matches
+		removeWordFromList(input);
+
+		//add x words per x seconds, changing based on time, maybe add a multiplier based on the number of 30 second seqments that have gone by? Instructions arent specific
+		for(int i = 0; i<(int)(finalWordClock-initialWordClock); i++){
+			addWordToList();
+			lineCount++;
+		}
+	
+	}
+
+	
+	return 0.0;
 }
+
+
+
+
+
+
+
+
+
+

@@ -26,22 +26,30 @@
 #include<string.h>
 #include<time.h>
 #include<ctype.h>
+#include<Math.h>
 
 //(True) constants
 #define MAXIMUM_WORD_LENGTH 16
 #define MAXIMUM_FILE_LENGTH 2000
-#define END_GAME_LINE 80
+#define END_GAME_LINE 15
+#define SCREEN_LENGTH 80
 //Set number of total words:
 	int totalWordNum;
+//Set playing board
+char playingBoard[END_GAME_LINE+20][SCREEN_LENGTH];
+
+//Set current lowest line
+int lowestLine = 0;	
 
 
 //Struct listings:
 
 
 //Function prototypes:
-void printWord(char *word);
 int addWordToGame(FILE *fp);
-
+void addWordToPlayingBoard(char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]);
+void printPlayingBoard();
+void removeWord(char *word);
 void SaveWordsLoop();
 void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]);
 double RunTheGame(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]);
@@ -103,23 +111,6 @@ int main() {
 
 //Function definitions
 
-/*
- *@author Marissa
- *This function randomly chooses the starting position of each word and prints it
- *It should pick its x position, the y position should always be at the top
- *The world should always be contained in the board, i.e. have enough space for its right for its length
- *
- */
-void printWord(char *word){
-	int lengthOfScreen = 80;
-	int wordLength = strlen(word);
-	int startingPosition = (rand()% (lengthOfScreen-wordLength));
-	
-	for(int i = 0; i<startingPosition; i++){
-		printf(" ");
-	}
-	printf("%s\n", word);
-}
 
 /*
  * This recursive function is used to append single words to our wordList file
@@ -154,7 +145,7 @@ void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENG
     FILE *fp = fopen("wordList.txt", "r");
     int count = 0;
     while (!feof(fp)) {
-        fscanf(fp, " %s", stringArray[count]);
+        fscanf(fp, " %s", stringArray[count]);		
 		count++;
     }
 	totalWordNum = count;
@@ -162,26 +153,122 @@ void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENG
 }
 
 /*
- *Prints the current list
- *
+ * This function adds one random word from the wordBank to the playingBoard at a random x position at the top most available y position.
+ * Probably not the best nor the most efficient way to do it, but its the way it makes sense in my mind.
 **/
 
-void printCurrentList(){
+void addWordToPlayingBoard(char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]){
 	
-}
-/*
- *This function will need to remove word from list, shift other words up?
- *
- */
-void removeWordFromList(char *input){
+	//Randomly find which row to take a word from wordBank from:
+	int row = rand()%totalWordNum;
+	int wordLength = 0;
+
+	//Find the length of the actual word
+	for(int i = 0; i<MAXIMUM_WORD_LENGTH; i++){
+		if(wordBank[row][i]!= '\0'){
+			wordLength++;
+		}
+	}
+
+	//Randomly find the starting x position:
+	int startingPosition = (rand()% (SCREEN_LENGTH-wordLength+1));
 	
+	//find the first line that has the space open for the word
+	int space = 0;
+	int j = -1;
+	while(space != wordLength +1){
+		j++;
+		space = 0;
+		for(int i = startingPosition; i<=startingPosition+wordLength; i++){
+			if(playingBoard[j][i] == '0'){
+				space++;
+			}
+		}
+	}
+	
+	//Put the word into the playingBoard
+	for(int i = startingPosition; i<=startingPosition+wordLength; i++){
+		if(i < startingPosition+wordLength){
+			playingBoard[j][i] = wordBank[row][i-startingPosition];
+		}else{
+			playingBoard[j][i] = '0';
+		}
+	}
+
+	//Update the lowest line currently in the game
+	if(j > lowestLine){
+		lowestLine = j;
+	}
 }
 
 /*
-*I feel like this function is complicated, need to check if word fits in each line
+ * This function prints the playingBoard to the screen.
 **/
-void addWordToList(){
+
+void printPlayingBoard(){
 	
+	for(int i = 0; i<=lowestLine; i++){
+		for(int j = 0; j<SCREEN_LENGTH; j++){
+			if(playingBoard[i][j] == '0'){
+				printf(" ");
+			}else{
+				printf("%c", playingBoard[i][j]);
+			}
+		}
+		printf("\n");
+	}
+	
+	for(int i = 0; i<END_GAME_LINE-lowestLine; i++){
+		printf("\n");
+	}
+	
+}
+
+void removeWord(char *word){
+	int wordLength = 0;
+	
+	//Find the actual word length
+	for(int i = 0; i<MAXIMUM_WORD_LENGTH; i++){
+		if(word[i] != '0'){
+			wordLength++;
+		}
+	}
+	
+	//Go through playingBoard and search for the word
+	int match = 0;
+	int wordCount = 0;
+	//The following two variables are to remember where the indexes of where the match was found
+	int rowMatch = 0;
+	int colMatch = 0;
+	int foundIt = 0;
+	
+	for(int i = 0; i<=END_GAME_LINE+20; i++){
+		for(int j = 0; j<SCREEN_LENGTH; j++){
+			if(playingBoard[i][j] == word[wordCount]){
+				match++;
+				wordCount++;
+				if(match +1 == wordLength){
+					rowMatch = i;
+					colMatch = j-wordLength+2;
+					foundIt = 1;
+				}
+			}else{
+				match = 0;
+				wordCount = 0;
+			}
+		}
+	}
+	
+	//If the number of matches == the length of the word, we replace all the chars w 0
+	//Replace with 0 bc of how I set up printPlayingBoard
+	if(foundIt == 1){
+		printf("Match found at [%d][%d]\n", rowMatch, colMatch);
+		for(int j = colMatch; j<wordLength+colMatch-1; j++){
+			printf("Replacing %c with 0\n", playingBoard[rowMatch][j]);
+			playingBoard[rowMatch][j] = '0';
+		}
+	}
+
 }
 
 /*
@@ -190,41 +277,49 @@ void addWordToList(){
  * Returns how long the function is ran for (which equals how long the user played the game for).
 **/
 double RunTheGame(char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]) {
-    char input[20];
 	
+	
+    char input[MAXIMUM_WORD_LENGTH];
+	int startingNumWords = 60;
+	
+	//Initialize input as zeros
+	for(int i = 0; i<MAXIMUM_WORD_LENGTH; i++){
+		input[i] = '0';
+	}
+	
+	//Initialize the playingBoard as  0, this helps with comparisons in addWordToPlayingBoard and printPlayingBoard
+	for(int i = 0; i<=END_GAME_LINE; i++){
+		for(int j = 0; j<=SCREEN_LENGTH; j++){
+			playingBoard[i][j] = '0';
+		}
+	}
+
 	//start initial clock
 	clock_t  initialClock = clock();
 	
-	//start loop: while (! at bottom of screen || wordList is empty)
-	FILE *fp = fopen("wordList.txt", "r");
-	int lineCount = 0;
-	
-	while((lineCount != END_GAME_LINE)&&(!feof(fp)){
-		//start per word clock
-		clock_t initialWordClock = clock();
-		
-		//TODO: create function
-		printCurrentList();
-		
-		//get input
-		scanf(" %c", input);
-		
-		//stop word clock
-		clock_t finalWordClock = clock(&input);
-		
-		//TODO: create function, remove word from list if matches
-		removeWordFromList(input);
-
-		//add x words per x seconds, changing based on time, maybe add a multiplier based on the number of 30 second seqments that have gone by? Instructions arent specific
-		for(int i = 0; i<(int)(finalWordClock-initialWordClock); i++){
-			addWordToList();
-			lineCount++;
-		}
-	
+	for(int i = 0; i< startingNumWords; i++){
+		addWordToPlayingBoard(wordBank);
 	}
-
+	int numWordsToAdd = 5;
 	
-	return 0.0;
+	while((lowestLine!=END_GAME_LINE)){
+		
+		printPlayingBoard();
+		scanf(" %s", input);
+		removeWord(input);
+		
+		
+		
+		for(int i = 0; i<numWordsToAdd; i++){
+			addWordToPlayingBoard(wordBank);
+		}
+		
+	}
+	//End of game clock time:
+	clock_t finalClock = clock();
+	
+	//These are not in the units of seconds, this is what I found online...not sure why its not seconds.
+	return (double)(finalClock-initialClock)/CLOCKS_PER_SEC;
 }
 
 

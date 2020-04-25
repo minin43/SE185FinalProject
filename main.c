@@ -3,6 +3,8 @@
  * Logan's project contribution: 50%
  * Marissa's project contribution: 50%
  * 
+ *Changed the if condition around like 216  to make sure doesn't remove word if you type in only the end of the word
+ *
  * Notes:
  * I noticed some issues with removeWord not working correctly
  * In order to simulate the words "advancing," we should be storing how long it takes for the user to input a word, then call advanceLine and addWordToPlayingBoard
@@ -124,12 +126,11 @@ void SaveWordsLoop() {
  * Because we're being given a copy of the array pointer, we're editing the original array
 **/
 void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]) {
-    //printf("PopulateStringTable - \n");
+
     FILE *fp = fopen("wordList.txt", "r");
     int count = 0;
     while (!feof(fp)) {
         fscanf(fp, " %s", stringArray[count]);
-        //printf("\tadding new word: %s\n", stringArray[count]);
 		count++;
     }
 	TotalWordNum = count;
@@ -188,30 +189,37 @@ void addWordToPlayingBoard() {
  * This function prints the PlayingBoard to the screen.
 **/
 void printPlayingBoard() {
+	for(int i = 0; i<SCREEN_LENGTH; i++){
+		printf("-");
+	}
+	printf("\n");
 	for (int i = 0; i < SCREEN_HEIGHT; i++){
         printf("\n", i);
 		for (int j = 0; j < SCREEN_LENGTH - 1; j++){
-            if (j == 0) {
-                printf("%d", i);
-            } else if (PlayingBoard[i][j] == '0'){
+			if (PlayingBoard[i][j] == '0'){
 				printf(" ");
 			} else {
 				printf("%c", PlayingBoard[i][j]);
 			}
 		}
-        //printf("\n");
+	}
+	printf("\n");
+	for(int i = 0; i<SCREEN_LENGTH; i++){
+		printf("-");
 	}
     printf("\n");
 }
 
 void removeWord(char word[MAXIMUM_WORD_LENGTH]) {
 	int wordLength = strlen(word);
+	char compareTo[MAXIMUM_WORD_LENGTH];
+	
+
 	
 	for (int i = SCREEN_HEIGHT - 1; i >= 0; i--) { //Start from the "top" (actually the bottom of the screen, where the player is most likely removing words from)
 		for (int j = 0; j < SCREEN_LENGTH; j++) {
             if (PlayingBoard[i][j] != '0') { //If we run into a non-space, we know we've run into the only word in this line
-                if (PlayingBoard[i][j] == word[0]) { //If the first letters match, grab the word and compare them to what we're given
-                    char compareTo[MAXIMUM_WORD_LENGTH];
+                if ((PlayingBoard[i][j] == word[0])&&((j ==0)||(PlayingBoard[i][j-1] == '0'))) { //If the first letters match, grab the word and compare them to what we're given only if its the first letter of a word
                     for (int c = 0; PlayingBoard[i][j + c] != '0'; c++) {
                         compareTo[c] = PlayingBoard[i][j + c];
                     }
@@ -220,8 +228,10 @@ void removeWord(char word[MAXIMUM_WORD_LENGTH]) {
                         strcpy(PlayingBoard[i], BlankLine);
                         return;
                     }
-                } else { //If they don't, it's not the word we're looking for, go to the next line
-                    break;
+                } else { //If they don't, it's not the word we're looking for, reset compareTo
+                    for(int i = 0; i<MAXIMUM_WORD_LENGTH; i++){
+						compareTo[i] = '\0';
+					}
                 }
             }
 		}
@@ -245,7 +255,6 @@ char* advanceLine() {
             strcpy(PlayingBoard[row], BlankLine);
         }
     }
-    //printf("returning: %s\n", toReturn);
     return toReturn;
 }
 
@@ -256,6 +265,8 @@ char* advanceLine() {
 **/
 double RunTheGame() {	
     char input[MAXIMUM_WORD_LENGTH];
+	int clockMultiplier;
+	
 
     //Fill PlayingBoard with blank lines
     for (int c = 0; c < SCREEN_HEIGHT; c++) {
@@ -263,21 +274,26 @@ double RunTheGame() {
     }
 
 	clock_t  initialClock = clock();
+	clock_t wordClock = clock();
 	
-	//advanceLine();
-
-    printf("start of loop...\n");
-	while(strcmp(advanceLine(), BlankLine) == 0){
-        addWordToPlayingBoard();
+	while(strcmp(advanceLine(), BlankLine) == 0){		
+        
+		clockMultiplier = ((clock()-initialClock)+(clock()-wordClock))/(CLOCKS_PER_SEC*15);
+		//Add more words per enter based on 1. overall time, 2. individual word speed
+		for(int i = 0; i<1+clockMultiplier; i++){
+			advanceLine();
+			addWordToPlayingBoard();
+		}	
 		printPlayingBoard();
 		scanf(" %s", input);
+		wordClock = clock();
 		removeWord(input);
 	}
+	
 	//End of game clock time:
 	clock_t finalClock = clock();
 	
-	//These are not in the units of seconds, this is what I found online...not sure why its not seconds.
-	return (double)(finalClock-initialClock)/CLOCKS_PER_SEC;
+	return (double)(finalClock-initialClock)/(CLOCKS_PER_SEC*1000);
 }
 
 

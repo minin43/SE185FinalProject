@@ -1,25 +1,14 @@
 /*
  * Developed by team members: Logan Christianson and Marissa Gustafson
- * Logan's project contribution: 0%
- * Marissa's project contribution: 0%
+ * Logan's project contribution: 50%
+ * Marissa's project contribution: 50%
+ * 
+ * Notes:
+ * I noticed some issues with removeWord not working correctly
+ * In order to simulate the words "advancing," we should be storing how long it takes for the user to input a word, then call advanceLine and addWordToPlayingBoard
+ * for each second it took. 1 word per second. That rate could have been variable, if we had more time, but don't worry about it otherwise.
+ * After those 2 issues are fixed, and we're getting accurate game times, we're done with the project.
 **/
-
-/*
- * I've gone ahead and finished the program structure/backbone. I rewrote the function that adds words to the file and made it recursive, and eliminated some unnecessary code.
- * I didn't delete your code so if you want to compare what we wrote or would rather use what you wrote, let me know and we can work it out, I just noticed some syntax and
- * logic errors we would need to work through otherwise, and decided to rewrite it so we can call it recursively instead.
- * 
- * We probably won't need to touch main() much further, everything else we'll need to do will be done in RunTheGame(). Why not run the game stuff in main()? Because it's a
- * good programming habit to segmentize your program into "tasks" - where functions are self-contained and can be ran in many different scopes. Fortunately for us, RunTheGame()
- * is only gonna need to be ran in 1 instance, so we don't need to be careful with it - however, we should still segment that task into its own function. So I did.
- * 
- * So continuing on, we'll probably want to create an "entry" struct to hold some info about each word that's scrolling down the console, like a numerical ID to reference it by,
- * the actual string, its location (x & y), and maybe other info too.
- * We'll still probably need a few more functions for displaying the full "board" of words. Might want to save the board state in an array h-tall, where h is the number of horizontal
- * lines our cygwin console displays by default.
- * RunTheGame() needs to be flesh out too. We'll need a loop inside it for continually printing the board then asking for input. Is there a timer function available in C? Maybe
- * we could run the display update in a timer? IDK how feasible that is.
-*/
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -31,37 +20,30 @@
 //(True) constants
 #define MAXIMUM_WORD_LENGTH 16
 #define MAXIMUM_FILE_LENGTH 2000
-#define END_GAME_LINE 15
+//#define END_GAME_LINE 15
 #define SCREEN_LENGTH 80
-//Set number of total words:
-	int totalWordNum;
-//Set playing board
-char playingBoard[END_GAME_LINE+20][SCREEN_LENGTH];
+#define SCREEN_HEIGHT 23 //24 if including the entry line
 
-//Set current lowest line
-int lowestLine = 0;	
-
-
-//Struct listings:
-
+//Globals
+int TotalWordNum; //Var for storing total # of words in the word bank
+char PlayingBoard[SCREEN_HEIGHT][SCREEN_LENGTH]; //Playing board, printed out for the player to see
+char WordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]; //Word bank of all possible words
+char ActiveWords[SCREEN_HEIGHT][MAXIMUM_WORD_LENGTH]; //Word bank of all ACTIVE words (currently in the game board) - not currently used since we're not checking
+char BlankLine[SCREEN_LENGTH] = "0000000000000000000000000000000000000000000000000000000000000000000000000000000"; //What a blank line is filled with in PlayingBoard
 
 //Function prototypes:
 int addWordToGame(FILE *fp);
-void addWordToPlayingBoard(char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]);
+void addWordToPlayingBoard();
 void printPlayingBoard();
 void removeWord(char *word);
 void SaveWordsLoop();
 void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]);
-double RunTheGame(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]);
+double RunTheGame();
+char* advanceLine();
 
 //Main function
 int main() {
-    //Start by openiong up our text file of words
-    char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH];
-	
 	srand(time(NULL));
-
-	
 
     //If our text file doesn't exist, prevent the program from running - do this here once so we don't have to check later if we run PopulateStringTable multiple times
     FILE *fp = fopen("wordList.txt", "r");
@@ -72,7 +54,7 @@ int main() {
     fclose(fp);
 
     //Populate our string table
-    PopulateStringTable(wordBank);
+    PopulateStringTable(WordBank);
 
     //We're ready to start running the core game loop
     printf("Welcome to Marissa's and Logan's Typing Game!\n");
@@ -83,7 +65,7 @@ int main() {
         scanf(" %c", &addWords);
         if (addWords == 'y') { //Since this is an introductory course, we don't technically need to check for bad user input - this is an easy "half-attempt" at it
             SaveWordsLoop();
-            PopulateStringTable(wordBank); //Since we've added more words to the file, add them to the word bank by re-creating the word bank (not very fast/efficient)
+            PopulateStringTable(WordBank); //Since we've added more words to the file, add them to the word bank by re-creating the word bank (not very fast/efficient)
         }
 
         //Start running the game after list the rules and an acknowledgement the user is ready
@@ -94,7 +76,7 @@ int main() {
         while (start != 'y') {
             scanf(" %c", &start);
         }
-        double runTime = RunTheGame(wordBank);
+        double runTime = RunTheGame();
 
         //After the game has finished, display their stats and ask if they want to go again. If not, exit the loop and end the program
         printf("Game over! You made it %.2lf seconds.\nWould you like to play again? Type 'y' to play again, 'n' to end the game: ", runTime * 1000);
@@ -142,133 +124,129 @@ void SaveWordsLoop() {
  * Because we're being given a copy of the array pointer, we're editing the original array
 **/
 void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]) {
+    //printf("PopulateStringTable - \n");
     FILE *fp = fopen("wordList.txt", "r");
     int count = 0;
     while (!feof(fp)) {
-        fscanf(fp, " %s", stringArray[count]);		
+        fscanf(fp, " %s", stringArray[count]);
+        //printf("\tadding new word: %s\n", stringArray[count]);
 		count++;
     }
-	totalWordNum = count;
+	TotalWordNum = count;
 	fclose(fp);
 }
 
 /*
- * This function adds one random word from the wordBank to the playingBoard at a random x position at the top most available y position.
+ * This function adds one random word from the WordBank to the PlayingBoard at a random x position at the top most available y position.
  * Probably not the best nor the most efficient way to do it, but its the way it makes sense in my mind.
+ * 
+ * Logan's comment: we should keep track of the words added to the board.
 **/
-
-void addWordToPlayingBoard(char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]){
-	
-	//Randomly find which row to take a word from wordBank from:
-	int row = rand()%totalWordNum;
-	int wordLength = 0;
-
-	//Find the length of the actual word
-	for(int i = 0; i<MAXIMUM_WORD_LENGTH; i++){
-		if(wordBank[row][i]!= '\0'){
-			wordLength++;
-		}
-	}
+void addWordToPlayingBoard() {
+    //Generate a new word, make sure it doesn't already exist in the game table
+	int row = rand() % TotalWordNum;
+    char toAdd[MAXIMUM_WORD_LENGTH];
+    strcpy(toAdd, WordBank[row]);
+    //currently disabled
+    /*while (1) {
+        strcpy(toAdd, WordBank[row]);
+        int cont = 0;
+        //printf("\tnew word: %s", toAdd);
+        for (int c = 0; c < SCREEN_HEIGHT; c++) {
+            //If we already have the word in the board, find a new one - this method of finding a new value is pretty awful
+            //in real-world applications, but since we know we're limited to 20 options, I don't really care
+            if (strcmp(toAdd, ActiveWords[c]) == 0) {
+                row = rand() % TotalWordNum;
+                cont = 1;
+                break;
+            }
+        }
+        if (cont == 0)
+            break;
+    }*/
+	int wordLength = strlen(toAdd);
 
 	//Randomly find the starting x position:
-	int startingPosition = (rand()% (SCREEN_LENGTH-wordLength+1));
-	
-	//find the first line that has the space open for the word
-	int space = 0;
-	int j = -1;
-	while(space != wordLength +1){
-		j++;
-		space = 0;
-		for(int i = startingPosition; i<=startingPosition+wordLength; i++){
-			if(playingBoard[j][i] == '0'){
-				space++;
+	int startingPosition = (rand() % (SCREEN_LENGTH - wordLength));
+
+    //Logan's comment: the word is always added to the top row of the array/game board, we shouldn't be finding open spaces, we're to assume it is open
+    //The function advanceBoard will pull all rows in the array down 1 and return the row at the bottom that we lost. If it contained a string, the player's lost the game
+    //We'll call that function BEFORE adding a new word, which will free up the top line for us to freely add another
+
+    //Generates the line with 0s for spaces and the characters where they should be
+    int wordCount = 0;
+    for (int col = 0; col < SCREEN_LENGTH - 1; col++) {
+        if (col == startingPosition || (col > startingPosition && col < startingPosition + wordLength)) {
+            PlayingBoard[0][col] = toAdd[wordCount++];
+        } else {
+            PlayingBoard[0][col] = '0';
+        }
+    }
+}
+
+/*
+ * This function prints the PlayingBoard to the screen.
+**/
+void printPlayingBoard() {
+	for (int i = 0; i < SCREEN_HEIGHT; i++){
+        printf("\n", i);
+		for (int j = 0; j < SCREEN_LENGTH - 1; j++){
+            if (j == 0) {
+                printf("%d", i);
+            } else if (PlayingBoard[i][j] == '0'){
+				printf(" ");
+			} else {
+				printf("%c", PlayingBoard[i][j]);
 			}
 		}
+        //printf("\n");
 	}
-	
-	//Put the word into the playingBoard
-	for(int i = startingPosition; i<=startingPosition+wordLength; i++){
-		if(i < startingPosition+wordLength){
-			playingBoard[j][i] = wordBank[row][i-startingPosition];
-		}else{
-			playingBoard[j][i] = '0';
-		}
-	}
+    printf("\n");
+}
 
-	//Update the lowest line currently in the game
-	if(j > lowestLine){
-		lowestLine = j;
+void removeWord(char word[MAXIMUM_WORD_LENGTH]) {
+	int wordLength = strlen(word);
+	
+	for (int i = SCREEN_HEIGHT - 1; i >= 0; i--) { //Start from the "top" (actually the bottom of the screen, where the player is most likely removing words from)
+		for (int j = 0; j < SCREEN_LENGTH; j++) {
+            if (PlayingBoard[i][j] != '0') { //If we run into a non-space, we know we've run into the only word in this line
+                if (PlayingBoard[i][j] == word[0]) { //If the first letters match, grab the word and compare them to what we're given
+                    char compareTo[MAXIMUM_WORD_LENGTH];
+                    for (int c = 0; PlayingBoard[i][j + c] != '0'; c++) {
+                        compareTo[c] = PlayingBoard[i][j + c];
+                    }
+
+                    if (strcmp(word, compareTo) == 0) {
+                        strcpy(PlayingBoard[i], BlankLine);
+                        return;
+                    }
+                } else { //If they don't, it's not the word we're looking for, go to the next line
+                    break;
+                }
+            }
+		}
 	}
 }
 
 /*
- * This function prints the playingBoard to the screen.
+ * Advances PlayerBoard down 1 line, returning the contents of the lost line, and adding a blank line (of '0's) along the top/0th row
 **/
-
-void printPlayingBoard(){
-	
-	for(int i = 0; i<=lowestLine; i++){
-		for(int j = 0; j<SCREEN_LENGTH; j++){
-			if(playingBoard[i][j] == '0'){
-				printf(" ");
-			}else{
-				printf("%c", playingBoard[i][j]);
-			}
-		}
-		printf("\n");
-	}
-	
-	for(int i = 0; i<END_GAME_LINE-lowestLine; i++){
-		printf("\n");
-	}
-	
-}
-
-void removeWord(char *word){
-	int wordLength = 0;
-	
-	//Find the actual word length
-	for(int i = 0; i<MAXIMUM_WORD_LENGTH; i++){
-		if(word[i] != '0'){
-			wordLength++;
-		}
-	}
-	
-	//Go through playingBoard and search for the word
-	int match = 0;
-	int wordCount = 0;
-	//The following two variables are to remember where the indexes of where the match was found
-	int rowMatch = 0;
-	int colMatch = 0;
-	int foundIt = 0;
-	
-	for(int i = 0; i<=END_GAME_LINE+20; i++){
-		for(int j = 0; j<SCREEN_LENGTH; j++){
-			if(playingBoard[i][j] == word[wordCount]){
-				match++;
-				wordCount++;
-				if(match +1 == wordLength){
-					rowMatch = i;
-					colMatch = j-wordLength+2;
-					foundIt = 1;
-				}
-			}else{
-				match = 0;
-				wordCount = 0;
-			}
-		}
-	}
-	
-	//If the number of matches == the length of the word, we replace all the chars w 0
-	//Replace with 0 bc of how I set up printPlayingBoard
-	if(foundIt == 1){
-		printf("Match found at [%d][%d]\n", rowMatch, colMatch);
-		for(int j = colMatch; j<wordLength+colMatch-1; j++){
-			printf("Replacing %c with 0\n", playingBoard[rowMatch][j]);
-			playingBoard[rowMatch][j] = '0';
-		}
-	}
-
+char* advanceLine() {
+    char *toReturn = malloc((sizeof(char) * SCREEN_LENGTH));
+    
+    for (int row = SCREEN_HEIGHT - 1; row >= 0; row--) {
+        if (row == SCREEN_HEIGHT - 1) {
+            strcpy(toReturn, PlayingBoard[row]);
+        }
+        
+        if (row - 1 >= 0) {
+            strcpy(PlayingBoard[row], PlayingBoard[row - 1]);
+        } else {
+            strcpy(PlayingBoard[row], BlankLine);
+        }
+    }
+    //printf("returning: %s\n", toReturn);
+    return toReturn;
 }
 
 /*
@@ -276,44 +254,24 @@ void removeWord(char *word){
  * As soon as this function is called, words start appearing in the console for the player to remove.
  * Returns how long the function is ran for (which equals how long the user played the game for).
 **/
-double RunTheGame(char wordBank[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]) {
-	
-	
+double RunTheGame() {	
     char input[MAXIMUM_WORD_LENGTH];
-	int startingNumWords = 60;
-	
-	//Initialize input as zeros
-	for(int i = 0; i<MAXIMUM_WORD_LENGTH; i++){
-		input[i] = '0';
-	}
-	
-	//Initialize the playingBoard as  0, this helps with comparisons in addWordToPlayingBoard and printPlayingBoard
-	for(int i = 0; i<=END_GAME_LINE; i++){
-		for(int j = 0; j<=SCREEN_LENGTH; j++){
-			playingBoard[i][j] = '0';
-		}
-	}
 
-	//start initial clock
+    //Fill PlayingBoard with blank lines
+    for (int c = 0; c < SCREEN_HEIGHT; c++) {
+        strcpy(PlayingBoard[c], BlankLine);
+    }
+
 	clock_t  initialClock = clock();
 	
-	for(int i = 0; i< startingNumWords; i++){
-		addWordToPlayingBoard(wordBank);
-	}
-	int numWordsToAdd = 5;
-	
-	while((lowestLine!=END_GAME_LINE)){
-		
+	//advanceLine();
+
+    printf("start of loop...\n");
+	while(strcmp(advanceLine(), BlankLine) == 0){
+        addWordToPlayingBoard();
 		printPlayingBoard();
 		scanf(" %s", input);
 		removeWord(input);
-		
-		
-		
-		for(int i = 0; i<numWordsToAdd; i++){
-			addWordToPlayingBoard(wordBank);
-		}
-		
 	}
 	//End of game clock time:
 	clock_t finalClock = clock();

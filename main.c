@@ -31,7 +31,7 @@ void printPlayingBoard();
 void removeWord(char *word);
 void SaveWordsLoop();
 void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENGTH]);
-double RunTheGame();
+void RunTheGame();
 char* advanceLine();
 
 //Main function
@@ -54,7 +54,7 @@ int main() {
         printf("Before the game begins, would you like to add words for the game to potentially use?\nType 'y' for yes, 'n' to continue to the game: ");
         char addWords;
         scanf(" %c", &addWords);
-        if (addWords == 'y') { //Since this is an introductory course, we don't technically need to check for bad user input - this is an easy "half-attempt" at it
+        if (addWords == 'y') { //We're not technically required need to check for bad user input - but this is an easy "half-attempt" at it
             SaveWordsLoop();
             PopulateStringTable(WordBank); //Since we've added more words to the file, add them to the word bank by re-creating the word bank (not very fast/efficient)
         }
@@ -67,17 +67,14 @@ int main() {
         while (start != 'y') {
             scanf(" %c", &start);
         }
-        clock_t startTime = clock();
-        RunTheGame();
-        clock_t endTime = clock();
-        double runTime = ((double) clock() - startTime) / CLOCKS_PER_SEC;
 
-        //printf("\nendTime: %d \tstartTime: %d", endTime, startTime);
-        //printf("\n\tendTime - startTime = %d\tclocks_per_sec = %d\n", (endTime - startTime), CLOCKS_PER_SEC);
-        //printf("\trecorded time in seconds: %lf\n", runTime);
+        int startTime = time(NULL);
+        RunTheGame(); //Originally ran with a return that we used to calculate total time played, but this is just easier
+        int endTime = time(NULL);
+        int runTime = endTime - startTime;
 
         //After the game has finished, display their stats and ask if they want to go again. If not, exit the loop and end the program
-        printf("Game over! You made it %.2lf seconds.\nWould you like to play again? Type 'y' to play again, 'n' to end the game: ", runTime * 1000);
+        printf("Game over! You made it %d seconds.\nWould you like to play again? Type 'y' to play again, 'n' to end the game: ", runTime);
         char playAgain;
         scanf(" %c", &playAgain);
         if (playAgain != 'y')
@@ -90,7 +87,6 @@ int main() {
 }
 
 //Function definitions
-
 
 /*
  * This recursive function is used to append single words to our wordList file
@@ -135,9 +131,6 @@ void PopulateStringTable(char stringArray[MAXIMUM_FILE_LENGTH][MAXIMUM_WORD_LENG
 
 /*
  * This function adds one random word from the WordBank to the PlayingBoard at a random x position at the top most available y position.
- * Probably not the best nor the most efficient way to do it, but its the way it makes sense in my mind.
- * 
- * Logan's comment: we should keep track of the words added to the board.
 **/
 void addWordToPlayingBoard() {
     //Generate a new word, make sure it doesn't already exist in the game table
@@ -164,14 +157,14 @@ void addWordToPlayingBoard() {
  * This function prints the PlayingBoard to the screen.
 **/
 void printPlayingBoard() {
-	for(int i = 0; i<SCREEN_LENGTH; i++){
+	for(int i = 0; i < SCREEN_LENGTH - 1; i++){
 		printf("-");
 	}
 	printf("\n");
 	for (int i = 0; i < SCREEN_HEIGHT; i++){
         printf("\n", i);
 		for (int j = 0; j < SCREEN_LENGTH - 1; j++){
-			if (PlayingBoard[i][j] == '0'){
+            if (PlayingBoard[i][j] == '0'){
 				printf(" ");
 			} else {
 				printf("%c", PlayingBoard[i][j]);
@@ -179,12 +172,16 @@ void printPlayingBoard() {
 		}
 	}
 	printf("\n");
-	for(int i = 0; i<SCREEN_LENGTH; i++){
+	for(int i = 0; i < SCREEN_LENGTH - 1; i++){
 		printf("-");
 	}
     printf("\n");
 }
 
+/*
+ * As the function name implies, removes the given word from our PlayingBoard array, if it exists
+ * Starts from the bottom, since that's most likely where we're removing words from first
+**/
 void removeWord(char word[MAXIMUM_WORD_LENGTH]) {
 	int wordLength = strlen(word);
 	char compareTo[MAXIMUM_WORD_LENGTH];
@@ -202,7 +199,7 @@ void removeWord(char word[MAXIMUM_WORD_LENGTH]) {
                         return;
                     }
                 } else { //If they don't, it's not the word we're looking for, reset compareTo
-                    for(int i = 0; i<MAXIMUM_WORD_LENGTH; i++){
+                    for (int i = 0; i < MAXIMUM_WORD_LENGTH; i++) {
 						compareTo[i] = '\0';
 					}
                 }
@@ -236,37 +233,30 @@ char* advanceLine() {
  * As soon as this function is called, words start appearing in the console for the player to remove.
  * Returns how long the function is ran for (which equals how long the user played the game for).
 **/
-double RunTheGame() {	
+void RunTheGame() {	
     char input[MAXIMUM_WORD_LENGTH];
-	int clockMultiplier;
 
     //Fill PlayingBoard with blank lines
     for (int c = 0; c < SCREEN_HEIGHT; c++) {
         strcpy(PlayingBoard[c], BlankLine);
     }
 
-	clock_t initialClock = clock();
-	clock_t wordClock = clock();
-	
-	while(strcmp(advanceLine(), BlankLine) == 0){		
-        
-		clockMultiplier = ((clock()-initialClock)+(clock()-wordClock))/(CLOCKS_PER_SEC*15);
-		//Add more words per enter based on 1. overall time, 2. individual word speed
-		for(int i = 0; i<1+clockMultiplier; i++){
-			advanceLine();
+    int mostRecentCheck = time(NULL);
+	addWordToPlayingBoard();
+	while(strcmp(advanceLine(), BlankLine) == 0) {
+		for(int i = 0; i < time(NULL) - mostRecentCheck; i++){
+			if (strcmp(advanceLine(), BlankLine) != 0)
+                return;
 			addWordToPlayingBoard();
-		}	
+		}
+        mostRecentCheck = time(NULL);
+
 		printPlayingBoard();
 		scanf(" %s", input);
-		wordClock = clock();
 		removeWord(input);
 	}
 	
-	//End of game clock time:
-	//clock_t finalClock = clock();
-	//printf("\nfinalClock: %d \tinitialClock: %d", finalClock, initialClock);
-    //printf("\n\tfinalClock - initialClock = %d\tclocks_per_sec = %d\n", (finalClock - initialClock), CLOCKS_PER_SEC);
-	return 0;//((double) (finalClock - initialClock)) / (CLOCKS_PER_SEC);
+	return;
 }
 
 
